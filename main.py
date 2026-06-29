@@ -163,7 +163,10 @@ class NeuralLayer:
         scale = math.sqrt(2.0 / input_size)
 
         # Initialize weights proportional to scale
-        weights = [[random.uniform(-scale, scale) for _ in range(input_size)] for _ in range(output_size)]
+        weights = [
+            [random.uniform(-scale, scale) for _ in range(input_size)]
+            for _ in range(output_size)
+        ]
         bias = [random.uniform(-0.1, 0.1) for _ in range(output_size)]
 
         return cls(weights, bias, activation)
@@ -224,7 +227,7 @@ class NeuralNetwork:
 
         return True
 
-    def forward(self, input: list[float]) -> list[float]:
+    def predict(self, input: list[float]) -> list[float]:
         """Performs forward propagation."""
         for layer in self.layers:
             input = layer.forward(input)
@@ -339,7 +342,7 @@ def main():
 
     print("--- Predictions BEFORE training ---")
     for x in inputs:
-        prediction = nn.forward(x)
+        prediction = nn.predict(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     print("\n--- Training ---")
@@ -359,7 +362,7 @@ def main():
 
     print("\n--- Predictions AFTER training ---")
     for x in inputs:
-        prediction = nn.forward(x)
+        prediction = nn.predict(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     # Plot the results
