@@ -67,6 +67,27 @@ def relu(value: float) -> float:
     return max(0.0, value)
 
 
+def mean_squared_error(predicted: list[float], expected: list[float]) -> float:
+    """Mean square error loss function."""
+    assert(len(predicted) == len(expected))
+    return sum(math.pow(e-p, 2) for p, e in zip(predicted, expected)) / 2
+
+
+def binary_cross_entropy(predicted: list[float], expected: list[float], epsilon: float = 1e-15) -> float:
+    """Binary cross-entropy loss function."""
+    assert(len(predicted) == len(expected))
+
+    total_loss = 0.0
+    for p, e in zip(predicted, expected):
+        # Clip predicted values between epsilon and 1 - epsilon
+        p = max(epsilon, min(1.0 - epsilon, p))
+
+        # Calculate BCE formula: -(y * log(p) + (1 - y) * log(1 - p))
+        total_loss += -(e * math.log(p) + (1.0 - e) * math.log(1.0 - p))
+
+    return total_loss / len(predicted)
+
+
 @dataclass
 class NeuralNetwork:
     """Neural network builder class."""
@@ -97,14 +118,19 @@ class NeuralNetwork:
             input = layer.forward(input)
         return input
 
+    def train(self):
+        pass
+
 
 def main():
     nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 2, relu))
-    nn.add_layer(NeuralLayer.from_size(2, 2, sigmoid))
+    nn.add_layer(NeuralLayer.from_size(2, 3, relu))
+    nn.add_layer(NeuralLayer.from_size(3, 1, sigmoid))
     if nn.validate():
-        output = nn.forward([0, 0])
-        print(output)
+        inputs = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
+        for x in inputs:
+            prediction = nn.forward(x)
+            print(f"Input: {x} -> Prediction: {prediction}")
     else:
         print("Invalid neural network")
 
