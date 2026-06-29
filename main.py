@@ -77,11 +77,9 @@ class EpochObserver(ABC):
 class ConsoleEpochObserver(EpochObserver):
     """Epoch observer that logs progress to the console at a set frequency."""
 
-    frequency: int
-    """How often (in epochs) progress should be logged to the console."""
-
     def __init__(self, frequency: int = 1000):
         self.frequency = frequency
+        """How often (in epochs) progress should be logged to the console."""
 
     def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
         """Callback to log output of current epoch to console."""
@@ -172,13 +170,76 @@ class NeuralNetwork:
 
         return True
 
-    def forward(self, input: list[float]) -> list[float]:
+    def predict(self, input: list[float]) -> list[float]:
         """Performs forward propagation."""
         for layer in self.layers:
             input = layer.forward(input)
         return input
 
-    def train(
+    def _forward(self, x: list[float]) -> tuple[list[float], list[list[float]]]:
+        """Performs a forward pass and returns (prediction, cached_layer_inputs)."""
+        layer_inputs = []
+        current_activation = x
+
+        for layer in self.layers:
+            layer_inputs.append(current_activation)
+            current_activation = layer.forward(current_activation)
+
+        return current_activation, layer_inputs
+
+    def _backward(
+        self,
+        layer_inputs: list[list[float]],
+        y_pred: list[float],
+        y_true: list[float],
+        learning_rate: float,
+        loss_fn: LossFunction,
+    ):
+        """Performs a backward pass (backpropagation) and updates parameters."""
+        # Compute gradient of loss with respect to prediction
+        layer_gradients = loss_fn.derivative(y_pred, y_true)
+
+        # Iterate backwards from output layer to input layer
+        for layer_idx in reversed(range(len(self.layers))):
+            layer = self.layers[layer_idx]
+            x_in = layer_inputs[layer_idx]
+
+            next_layer_gradients = [0.0] * len(x_in)
+            layer_output = layer.forward(x_in)
+
+            for j in range(layer.output_size):
+                output_j = layer_output[j]
+
+                # Calculate delta
+                if layer.activation:
+                    delta = layer_gradients[j] * layer.activation.derivative(output_j)
+                else:
+                    delta = layer_gradients[j]
+
+                # Update bias
+                layer.bias[j] -= learning_rate * delta
+
+                # Update weights and accumulate next layer gradients
+                for i in range(layer.input_size):
+                    next_layer_gradients[i] += delta * layer.weights[j][i]
+                    layer.weights[j][i] -= learning_rate * delta * x_in[i]
+
+            layer_gradients = next_layer_gradients
+
+    def _learn_step(
+        self,
+        x: list[float],
+        y_true: list[float],
+        learning_rate: float,
+        loss_fn: LossFunction,
+    ) -> float:
+        """Runs a single forward and backward step for one training sample, returning the loss."""
+        y_pred, layer_inputs = self._forward(x)
+        loss = loss_fn(y_pred, y_true)
+        self._backward(layer_inputs, y_pred, y_true, learning_rate, loss_fn)
+        return loss
+
+    def learn(
         self,
         inputs: list[list[float]],
         targets: list[list[float]],
@@ -187,61 +248,20 @@ class NeuralNetwork:
         loss_fn: LossFunction,
         observer: EpochObserver | None = None,
     ):
-        """Trains the network using backpropagation and gradient descent."""
+        """Trains the network by running train steps over multiple epochs."""
         assert len(inputs) == len(targets)
 
         for epoch in range(epochs):
             total_loss = 0.0
 
             for x, y_true in zip(inputs, targets):
-                # --- 1. FORWARD PASS (with caching) ---
-                layer_inputs = []
-                current_activation = x
+                total_loss += self._learn_step(x, y_true, learning_rate, loss_fn)
 
-                for layer in self.layers:
-                    layer_inputs.append(current_activation)
-                    current_activation = layer.forward(current_activation)
-
-                y_pred = current_activation
-                total_loss += loss_fn(y_pred, y_true)
-
-                # --- 2. BACKWARD PASS (Backpropagation) ---
-                # Compute gradient of loss with respect to prediction
-                layer_gradients = loss_fn.derivative(y_pred, y_true)
-
-                # Iterate backwards from output layer to input layer
-                for layer_idx in reversed(range(len(self.layers))):
-                    layer = self.layers[layer_idx]
-                    x_in = layer_inputs[layer_idx]
-
-                    next_layer_gradients = [0.0] * len(x_in)
-                    layer_output = layer.forward(x_in)
-
-                    for j in range(layer.output_size):
-                        output_j = layer_output[j]
-
-                        # Calculate delta
-                        if layer.activation:
-                            delta = layer_gradients[j] * layer.activation.derivative(output_j)
-                        else:
-                            delta = layer_gradients[j]
-
-                        # Update bias
-                        layer.bias[j] -= learning_rate * delta
-
-                        # Update weights and accumulate next layer gradients
-                        for i in range(layer.input_size):
-                            next_layer_gradients[i] += delta * layer.weights[j][i]
-                            layer.weights[j][i] -= learning_rate * delta * x_in[i]
-
-                    layer_gradients = next_layer_gradients
-
-            # Notify observer at the end of each epoch
             if observer is not None:
                 observer.on_epoch_end(epoch, epochs, total_loss / len(inputs))
 
 
-def main():
+def main() -> int:
     random.seed(42)
 
     nn = NeuralNetwork()
@@ -250,19 +270,19 @@ def main():
 
     if not nn.validate():
         print("Invalid neural network configuration.")
-        return
+        return 0
 
     inputs = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
     targets = [[0.0], [1.0], [1.0], [0.0]]
 
     print("--- Predictions BEFORE training ---")
     for x in inputs:
-        prediction = nn.forward(x)
+        prediction = nn.predict(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     print("\n--- Training ---")
     observer = ConsoleEpochObserver(frequency=2000)
-    nn.train(
+    nn.learn(
         inputs,
         targets,
         epochs=10000,
@@ -273,9 +293,12 @@ def main():
 
     print("\n--- Predictions AFTER training ---")
     for x in inputs:
-        prediction = nn.forward(x)
+        prediction = nn.predict(x)
         print(f"Input: {x} -> Prediction: {prediction}")
+
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(main())
