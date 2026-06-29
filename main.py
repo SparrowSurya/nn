@@ -87,6 +87,59 @@ class ConsoleEpochObserver(EpochObserver):
             print(f"Epoch {epoch}/{total_epochs} - Loss: {loss:.6f}")
 
 
+class PlotEpochObserver(EpochObserver):
+    """Epoch observer that records loss at each epoch and plots it using matplotlib."""
+
+    def __init__(self):
+        self.losses: list[float] = []
+        """Records loss at each epoch."""
+
+    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
+        """Records loss value of current epoch."""
+        self.losses.append(loss)
+
+    def plot(self, save_path: str | None = None):
+        """Plots the loss history. Saves the plot to a file if save_path is specified."""
+        import matplotlib
+        # In headless environments, use 'Agg' backend to prevent GUI initialization errors
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+
+        plt.figure(figsize=(8, 5))
+        plt.plot(self.losses, label="Training Loss", color="royalblue", linewidth=2)
+        plt.title("Loss Progression over Epochs")
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.grid(True, linestyle="--", alpha=0.6)
+        plt.legend()
+
+        if save_path:
+            plt.savefig(save_path)
+            print(f"Saved loss plot to: {save_path}")
+
+        try:
+            plt.show()
+        except Exception:
+            if not save_path:
+                plt.savefig("loss_curve.png")
+                print("No display available. Saved plot to 'loss_curve.png'")
+
+
+class CompositeEpochObserver(EpochObserver):
+    """Observer that delegates callbacks to multiple other epoch observers."""
+
+    def __init__(self, observers: list[EpochObserver]):
+        self.observers = observers
+
+    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
+        """Passes the callback execution to all registered observers."""
+        for observer in self.observers:
+            observer.on_epoch_end(epoch, total_epochs, loss)
+
+
 @dataclass
 class NeuralLayer:
     """Represents a single layer in neural network."""
@@ -170,13 +223,13 @@ class NeuralNetwork:
 
         return True
 
-    def predict(self, input: list[float]) -> list[float]:
+    def forward(self, input: list[float]) -> list[float]:
         """Performs forward propagation."""
         for layer in self.layers:
             input = layer.forward(input)
         return input
 
-    def _forward(self, x: list[float]) -> tuple[list[float], list[list[float]]]:
+    def _forward_step(self, x: list[float]) -> tuple[list[float], list[list[float]]]:
         """Performs a forward pass and returns (prediction, cached_layer_inputs)."""
         layer_inputs = []
         current_activation = x
@@ -187,7 +240,7 @@ class NeuralNetwork:
 
         return current_activation, layer_inputs
 
-    def _backward(
+    def _backward_step(
         self,
         layer_inputs: list[list[float]],
         y_pred: list[float],
@@ -226,7 +279,7 @@ class NeuralNetwork:
 
             layer_gradients = next_layer_gradients
 
-    def _learn_step(
+    def _train_step(
         self,
         x: list[float],
         y_true: list[float],
@@ -234,12 +287,18 @@ class NeuralNetwork:
         loss_fn: LossFunction,
     ) -> float:
         """Runs a single forward and backward step for one training sample, returning the loss."""
-        y_pred, layer_inputs = self._forward(x)
+        # 1. Forward Pass
+        y_pred, layer_inputs = self._forward_step(x)
+
+        # 2. Compute Loss
         loss = loss_fn(y_pred, y_true)
-        self._backward(layer_inputs, y_pred, y_true, learning_rate, loss_fn)
+
+        # 3. Backward Pass
+        self._backward_step(layer_inputs, y_pred, y_true, learning_rate, loss_fn)
+
         return loss
 
-    def learn(
+    def train(
         self,
         inputs: list[list[float]],
         targets: list[list[float]],
@@ -255,50 +314,60 @@ class NeuralNetwork:
             total_loss = 0.0
 
             for x, y_true in zip(inputs, targets):
-                total_loss += self._learn_step(x, y_true, learning_rate, loss_fn)
+                total_loss += self._train_step(x, y_true, learning_rate, loss_fn)
 
+            # Notify observer at the end of each epoch
             if observer is not None:
                 observer.on_epoch_end(epoch, epochs, total_loss / len(inputs))
 
 
-def main() -> int:
+def main():
+
+    # Helper for weight initialization between -1.0 and 1.0
+    def random_weight_init():
+        return random.uniform(-1.0, 1.0)
+
     random.seed(42)
 
     nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU(), random_func=lambda: random.uniform(-1.0, 1.0)))
-    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid(), random_func=lambda: random.uniform(-1.0, 1.0)))
+    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU(), random_func=random_weight_init))
+    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid(), random_func=random_weight_init))
 
     if not nn.validate():
         print("Invalid neural network configuration.")
-        return 0
+        return
 
     inputs = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
     targets = [[0.0], [1.0], [1.0], [0.0]]
 
     print("--- Predictions BEFORE training ---")
     for x in inputs:
-        prediction = nn.predict(x)
+        prediction = nn.forward(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     print("\n--- Training ---")
-    observer = ConsoleEpochObserver(frequency=2000)
-    nn.learn(
+    # Setup modular observers
+    console_observer = ConsoleEpochObserver(frequency=2000)
+    plot_observer = PlotEpochObserver()
+    composite_observer = CompositeEpochObserver([console_observer, plot_observer])
+
+    nn.train(
         inputs,
         targets,
-        epochs=10000,
+        epochs=2000,
         learning_rate=0.2,
         loss_fn=MeanSquaredError(),
-        observer=observer,
+        observer=composite_observer,
     )
 
     print("\n--- Predictions AFTER training ---")
     for x in inputs:
-        prediction = nn.predict(x)
+        prediction = nn.forward(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
-    return 1
+    # Plot the results
+    plot_observer.plot()
 
 
 if __name__ == "__main__":
-    import sys
-    sys.exit(main())
+    main()
