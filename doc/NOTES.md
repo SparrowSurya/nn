@@ -66,6 +66,17 @@ Biases:  b1 (vector of 3)          Biases:  b2 (vector of 2)
 
 Activation functions introduce **non-linearity** into the network. Without them, a neural network—no matter how many layers it has—would behave like a single linear regression model ($y = wx + b$), failing to learn non-linear patterns (like the XOR gate).
 
+### Output Layer Activation Selection Summary
+Depending on the task, different activation functions are selected for the output layer to shape the output values:
+
+| Task Type | Output Activation | Output Range | Example |
+| :--- | :--- | :--- | :--- |
+| **Binary Classification** | Sigmoid | `0` to `1` (probability) | Predict XOR output, spam vs. not spam |
+| **Multi-class Classification** | Softmax | `0` to `1` (summing to `1.0` across all outputs) | Predict digit `0` through `9` |
+| **Regression** | None (Linear) | $-\infty$ to $+\infty$ | Predict housing prices, temperatures |
+
+---
+
 ### I. ReLU (Rectified Linear Unit)
 The most widely used activation function for hidden layers in modern deep learning.
 
@@ -86,7 +97,16 @@ The most widely used activation function for hidden layers in modern deep learni
 
 ---
 
-### II. Sigmoid
+### II. Leaky ReLU
+A variant of ReLU designed to prevent neurons from "dying".
+
+* **Math**:
+  $$f(x) = \max(\alpha x, x) \quad (\text{typically } \alpha = 0.01)$$
+* **When to Use**: Used in hidden layers when regular ReLU suffers from "dying ReLU" (where neurons get stuck outputting `0` for all inputs and stop updating).
+
+---
+
+### III. Sigmoid
 A classic activation function that squashes any input value into a range between `0` and `1`.
 
 * **Math**:
@@ -104,6 +124,32 @@ A classic activation function that squashes any input value into a range between
 
 ---
 
+### IV. Tanh (Hyperbolic Tangent)
+A zero-centered activation function that squashes values between `-1` and `1`.
+
+* **Math**:
+  $$f(x) = \tanh(x) = \frac{e^x - e^{-x}}{e^x + e^{-x}}$$
+* **Graph**:
+  ```text
+     1.0 +       _--~~~
+         |     _-
+     0.0 +----+---- (0, 0)
+         |  _-
+    -1.0 +_--
+  ```
+* **When to Use**: Historically used in hidden layers before ReLU. It is zero-centered, meaning negative inputs map to negative outputs, making optimization easier than Sigmoid.
+
+---
+
+### V. Softmax
+Converts a vector of numbers into a vector of probabilities that sum to `1.0`.
+
+* **Math**:
+  $$f(x_i) = \frac{e^{x_i}}{\sum_{k} e^{x_k}}$$
+* **When to Use**: Used exclusively in the **output layer** for multi-class classification problems.
+
+---
+
 ## 4. Loss Functions
 
 A **Loss Function** measures how far off the network's predictions are from the true targets. It serves as the primary metric that the network minimizes during training.
@@ -118,12 +164,32 @@ Calculates the average of the squared differences between the predicted outputs 
   $$\frac{\partial L}{\partial \hat{y}} = \hat{y} - y$$
   This clean derivative represents the direct error signal used to correct the weights during backpropagation.
 
-### II. Binary Cross-Entropy (BCE)
+---
+
+### II. Mean Absolute Error (MAE / L1 Loss)
+Calculates the average of the absolute differences between the predictions and targets.
+
+* **Math**:
+  $$L = |y - \hat{y}|$$
+* **When to Use**: Regression tasks where you want to be robust to outliers. Because errors are not squared, outliers do not dominate the gradient updates.
+
+---
+
+### III. Binary Cross-Entropy (BCE)
 Measures the performance of a classification model whose output is a probability value between 0 and 1.
 
 * **Math**:
   $$L = - \Big( y \log(\hat{y}) + (1 - y) \log(1 - \hat{y}) \Big)$$
-* **When to Use**: The industry standard for binary classification problems (such as the XOR gate). It heavily penalizes incorrect predictions that are confident (e.g., predicting `0.01` when the target is `1`), which speeds up optimization.
+* **When to Use**: The industry standard for binary classification problems (such as the XOR gate). It heavily penalizes incorrect predictions that are confident, which speeds up optimization.
+
+---
+
+### IV. Categorical Cross-Entropy
+Measures performance for multi-class classification.
+
+* **Math**:
+  $$L = -\sum_{i} y_i \log(\hat{y}_i)$$
+* **When to Use**: Used in multi-class classification problems, typically paired with a Softmax output layer.
 
 ---
 
@@ -161,3 +227,56 @@ For a single neuron $j$ in a layer receiving inputs $x_i$:
 
 4. **Pass Gradient Backward**: Calculate the error contribution for the previous layer to continue backpropagation:
    $$\text{next\_gradient}_i = \sum_j \delta_j \cdot w_{j, i}$$
+
+
+## Deciding architecture
+Here is how you decide these core architectural components when designing a neural network:
+
+### 1. Size of Input and Output Layers
+
+These are the easiest to decide because they are strictly determined by your data and task, not by choice.
+
+* Input Layer Size: Matches the number of features in a single input sample.
+  * Example (XOR): The inputs are pairs like  [0, 1] , so the size is  2 .
+  * Example (Image): A 28 × 28 pixel image has 784 total pixels, so the input size is  784  (when flattened).
+* Output Layer Size: Matches the number of values you want the network to predict.
+  * Example (Binary Classification / XOR): You want a single probability (is the output  0  or  1 ?), so the output size is  1 .
+  * Example (Digit Classification 0-9): You want to know which of the 10 digits it is, so the output size is  10 .
+
+
+### 2. Number and Size of Hidden Layers
+
+This is determined by the complexity of the problem.
+
+#### Number of Hidden Layers (Depth)
+
+* 0 Hidden Layers: Can only solve linearly separable problems (like simple linear regression, or AND/OR gates).
+* 1 Hidden Layer: Capable of approximating almost any continuous function (known as the Universal Approximation Theorem).
+* 2+ Hidden Layers: Used for complex tasks (images, audio, natural language). Deep layers learn hierarchical patterns: the first layer learns simple
+shapes (lines/edges), the next learns combinations of those shapes, and the final layers learn complex objects.
+
+#### Size of Hidden Layers (Width)
+
+* Rule of Thumb: Start with a size between your input and output size.
+* Too small: The network won't have enough capacity to learn the relationships (underfitting).
+* Too large: The network will memorize the training dataset instead of generalizing (overfitting), and it will train much slower.
+* XOR Example: Since input is  2  and output is  1 , projecting to a hidden layer of size  3  gives the network the mathematical flexibility to draw the
+decision boundaries needed for XOR.
+
+### 3. Which Activation Function to Use?
+
+This depends entirely on where the layer is in the network.
+#### A. In Hidden Layers (Standard Default: ReLU)
+
+* ReLU (Rectified Linear Unit) is the industry standard for hidden layers. It is computationally very fast (just max(0,x)) and avoids the vanishing
+gradient problem, allowing deep networks to train successfully.
+* Sigmoid or Tanh are rarely used in hidden layers today because they "saturate" (when inputs are very high or very low, their gradients become nearly  0 ,
+which halts learning).
+#### B. In the Output Layer (Determined by Task Type)
+The output activation shapes the final prediction format:
+  Task Type                     | Output Activation            | Output Range                                     | Example
+-------------------------------|------------------------------|--------------------------------------------------|---------------------------------------
+  Binary Classification         | Sigmoid                      |  0  to  1  (probability)                         | Predict XOR output, spam vs. not spam
+  Multi-class Classification    | Softmax                      |  0  to  1  (summing to  1.0  across all outputs) | Predict digit  0  through  9
+  Regression                    | None (Linear)                | -∞ to +∞                                         | Predict housing prices, temperatures
+
