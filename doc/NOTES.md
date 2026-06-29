@@ -124,3 +124,40 @@ Measures the performance of a classification model whose output is a probability
 * **Math**:
   $$L = - \Big( y \log(\hat{y}) + (1 - y) \log(1 - \hat{y}) \Big)$$
 * **When to Use**: The industry standard for binary classification problems (such as the XOR gate). It heavily penalizes incorrect predictions that are confident (e.g., predicting `0.01` when the target is `1`), which speeds up optimization.
+
+---
+
+## 5. Training and Backpropagation
+
+The training process consists of iteratively optimizing the network's parameters (weights and biases) to minimize the loss. This is broken down into structured steps.
+
+### I. The Modular Training Loop
+To keep the network architecture understandable, training is split into four distinct steps:
+
+1. **Forward Step**: Propagates the input through the network to generate predictions, caching the input values of each layer so they are available for backpropagation.
+2. **Loss Calculation**: Evaluates how close the prediction is to the target.
+3. **Backward Step**: Goes backwards through the network layers, calculating how changing each weight/bias impacts the overall loss.
+4. **Parameter Updates**: Adjusts the weights and biases using **Gradient Descent**:
+   $$W \leftarrow W - (\alpha \cdot \text{gradient}_W)$$
+   $$b \leftarrow b - (\alpha \cdot \text{gradient}_b)$$
+   *(where $\alpha$ is the learning rate)*
+
+---
+
+### II. Backpropagation Mathematics
+Backpropagation uses the **Calculus Chain Rule** to calculate the contribution of each weight to the output error.
+
+For a single neuron $j$ in a layer receiving inputs $x_i$:
+
+1. **Calculate Delta ($\delta_j$)**: The error signal for neuron $j$, representing how much the pre-activation sum $z_j$ affects the loss.
+   $$\delta_j = \text{error}_j \cdot \sigma'(z_j)$$
+   *(where $\sigma'(z_j)$ is the derivative of the activation function at that output)*
+
+2. **Update Bias**: Adjust the bias directly proportional to the delta:
+   $$b_j \leftarrow b_j - \alpha \cdot \delta_j$$
+
+3. **Update Weight**: Adjust the weight proportional to delta scaled by the input $x_i$ that came into it:
+   $$w_{j, i} \leftarrow w_{j, i} - \alpha \cdot \delta_j \cdot x_i$$
+
+4. **Pass Gradient Backward**: Calculate the error contribution for the previous layer to continue backpropagation:
+   $$\text{next\_gradient}_i = \sum_j \delta_j \cdot w_{j, i}$$
