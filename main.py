@@ -2,7 +2,7 @@ import math
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Self, Callable
+from typing import Self
 
 
 class ActivationFunction(ABC):
@@ -159,12 +159,13 @@ class NeuralLayer:
         input_size: int,
         output_size: int,
         activation: ActivationFunction | None = None,
-        random_func: Callable[[], float] | None = None,
     ) -> Self:
-        """Creates random values from input and output sizes."""
-        random_func = random.random if random_func is None else random_func
-        weights = [[random_func() for _ in range(input_size)] for _ in range(output_size)]
-        bias = [random_func() for _ in range(output_size)]
+        scale = math.sqrt(2.0 / input_size)
+
+        # Initialize weights proportional to scale
+        weights = [[random.uniform(-scale, scale) for _ in range(input_size)] for _ in range(output_size)]
+        bias = [random.uniform(-0.1, 0.1) for _ in range(output_size)]
+
         return cls(weights, bias, activation)
 
     def __post_init__(self):
@@ -322,16 +323,12 @@ class NeuralNetwork:
 
 
 def main():
-
-    # Helper for weight initialization between -1.0 and 1.0
-    def random_weight_init():
-        return random.uniform(-1.0, 1.0)
-
+    """Entry point."""
     random.seed(42)
 
     nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU(), random_func=random_weight_init))
-    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid(), random_func=random_weight_init))
+    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU()))
+    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid()))
 
     if not nn.validate():
         print("Invalid neural network configuration.")
@@ -346,15 +343,15 @@ def main():
         print(f"Input: {x} -> Prediction: {prediction}")
 
     print("\n--- Training ---")
-    # Setup modular observers
-    console_observer = ConsoleEpochObserver(frequency=2000)
+
+    console_observer = ConsoleEpochObserver(frequency=200)
     plot_observer = PlotEpochObserver()
     composite_observer = CompositeEpochObserver([console_observer, plot_observer])
 
     nn.train(
         inputs,
         targets,
-        epochs=2000,
+        epochs=1000,
         learning_rate=0.2,
         loss_fn=MeanSquaredError(),
         observer=composite_observer,
