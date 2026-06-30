@@ -1,339 +1,23 @@
-import math
+"""
+This file is the main entry point of the program.
+"""
+
 import random
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Self
-
-
-class ActivationFunction(ABC):
-    """Abstract base class representing an activation function and its derivative."""
-
-    @abstractmethod
-    def __call__(self, value: float) -> float:
-        """Computes the activation function for a given input value."""
-        pass
-
-    @abstractmethod
-    def derivative(self, activated_value: float) -> float:
-        """Computes the derivative of the activation function given its activated output."""
-        pass
-
-
-class Sigmoid(ActivationFunction):
-    """Sigmoid activation function."""
-
-    def __call__(self, value: float) -> float:
-        return 1.0 / (1 + math.pow(math.e, -value))
-
-    def derivative(self, activated_value: float) -> float:
-        return activated_value * (1.0 - activated_value)
-
-
-class ReLU(ActivationFunction):
-    """Rectified Linear Unit (ReLU) activation function."""
-
-    def __call__(self, value: float) -> float:
-        return max(0.0, value)
-
-    def derivative(self, activated_value: float) -> float:
-        return 1.0 if activated_value > 0.0 else 0.0
-
-
-class LossFunction(ABC):
-    """Abstract base class representing a loss function and its derivative."""
-
-    @abstractmethod
-    def __call__(self, predicted: list[float], expected: list[float]) -> float:
-        """Computes the loss value given predicted and expected lists."""
-        pass
-
-    @abstractmethod
-    def derivative(self, predicted: list[float], expected: list[float]) -> list[float]:
-        """Computes the gradient (derivatives) of the loss with respect to predictions."""
-        pass
-
-
-class MeanSquaredError(LossFunction):
-    """Mean Squared Error (MSE) loss function."""
-
-    def __call__(self, predicted: list[float], expected: list[float]) -> float:
-        assert len(predicted) == len(expected)
-        return sum(math.pow(e - p, 2) for p, e in zip(predicted, expected)) / 2
-
-    def derivative(self, predicted: list[float], expected: list[float]) -> list[float]:
-        assert len(predicted) == len(expected)
-        return [p - e for p, e in zip(predicted, expected)]
-
-
-class EpochObserver(ABC):
-    """Abstract base class representing an observer for training epochs."""
-
-    @abstractmethod
-    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
-        """Called at the end of each epoch with the current status."""
-        pass
-
-
-class ConsoleEpochObserver(EpochObserver):
-    """Epoch observer that logs progress to the console at a set frequency."""
-
-    frequency: int
-    """How often (in epochs) progress should be logged to the console."""
-
-    def __init__(self, frequency: int = 1000):
-        self.frequency = frequency
-
-    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
-        """Callback to log output of current epoch to console."""
-        if epoch % self.frequency == 0:
-            print(f"Epoch {epoch}/{total_epochs} - Loss: {loss:.6f}")
-
-
-class PlotEpochObserver(EpochObserver):
-    """Epoch observer that records loss at each epoch and plots it using matplotlib."""
-
-    def __init__(self):
-        self.losses: list[float] = []
-        """Records loss at each epoch."""
-
-    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
-        """Records loss value of current epoch."""
-        self.losses.append(loss)
-
-    def plot(self, save_path: str | None = None):
-        """Plots the loss history. Saves the plot to a file if save_path is specified."""
-        import matplotlib
-        # In headless environments, use 'Agg' backend to prevent GUI initialization errors
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError:
-            matplotlib.use('Agg')
-            import matplotlib.pyplot as plt
-
-        plt.figure(figsize=(8, 5))
-        plt.plot(self.losses, label="Training Loss", color="royalblue", linewidth=2)
-        plt.title("Loss Progression over Epochs")
-        plt.xlabel("Epochs")
-        plt.ylabel("Loss")
-        plt.grid(True, linestyle="--", alpha=0.6)
-        plt.legend()
-
-        if save_path:
-            plt.savefig(save_path)
-            print(f"Saved loss plot to: {save_path}")
-
-        try:
-            plt.show()
-        except Exception:
-            if not save_path:
-                plt.savefig("loss_curve.png")
-                print("No display available. Saved plot to 'loss_curve.png'")
-
-
-class CompositeEpochObserver(EpochObserver):
-    """Observer that delegates callbacks to multiple other epoch observers."""
-
-    def __init__(self, observers: list[EpochObserver]):
-        self.observers = observers
-
-    def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
-        """Passes the callback execution to all registered observers."""
-        for observer in self.observers:
-            observer.on_epoch_end(epoch, total_epochs, loss)
-
-
-@dataclass
-class NeuralLayer:
-    """Represents a single layer in neural network."""
-
-    weights: list[list[float]]
-    """Represents the weights in the layer."""
-
-    bias: list[float]
-    """Represents the bias in the layer."""
-
-    activation: ActivationFunction | None = None
-    """Represents the activation function."""
-
-    @classmethod
-    def from_size(
-        cls,
-        input_size: int,
-        output_size: int,
-        activation: ActivationFunction | None = None,
-    ) -> Self:
-        scale = math.sqrt(2.0 / input_size)
-
-        # Initialize weights proportional to scale
-        weights = [
-            [random.uniform(-scale, scale) for _ in range(input_size)]
-            for _ in range(output_size)
-        ]
-        bias = [random.uniform(-0.1, 0.1) for _ in range(output_size)]
-
-        return cls(weights, bias, activation)
-
-    def __post_init__(self):
-        assert len(self.weights) == len(self.bias)
-
-    @property
-    def input_size(self) -> int:
-        """Provides input values size for this layer."""
-        assert len(self.weights) > 0
-        return len(self.weights[0])
-
-    @property
-    def output_size(self) -> int:
-        """Provides output values size for this layer."""
-        return len(self.bias)
-
-    def forward(self, layer_input: list[float]) -> list[float]:
-        """Computes the forward pass for this layer."""
-        layer_output = []
-
-        # Each neuron has its own list of weights and a bias
-        for neuron_weights, neuron_bias in zip(self.weights, self.bias):
-            # Calculate dot product: sum(input_i * weight_i) + bias
-            z = sum(x * w for x, w in zip(layer_input, neuron_weights)) + neuron_bias
-
-            # Apply the activation function if one is defined
-            if self.activation:
-                z = self.activation(z)
-
-            layer_output.append(z)
-
-        return layer_output
-
-
-@dataclass
-class NeuralNetwork:
-    """Neural network builder class."""
-
-    layers: list[NeuralLayer] = field(default_factory=lambda: [])
-    """Sequence of layers."""
-
-    def add_layer(self, layer: NeuralLayer):
-        """Adds new layer next to last layer."""
-        self.layers.append(layer)
-
-    def validate(self) -> bool:
-        """Verifies if the output layer matches the input layer of the next layer."""
-        if len(self.layers) == 0:
-            return False
-
-        last = self.layers[0]
-        for layer in self.layers[1:]:
-            if layer.input_size != last.output_size:
-                return False
-            last = layer
-
-        return True
-
-    def predict(self, input: list[float]) -> list[float]:
-        """Performs forward propagation."""
-        for layer in self.layers:
-            input = layer.forward(input)
-        return input
-
-    def _forward_step(self, x: list[float]) -> tuple[list[float], list[list[float]]]:
-        """Performs a forward pass and returns (prediction, cached_layer_inputs)."""
-        layer_inputs = []
-        current_activation = x
-
-        for layer in self.layers:
-            layer_inputs.append(current_activation)
-            current_activation = layer.forward(current_activation)
-
-        return current_activation, layer_inputs
-
-    def _backward_step(
-        self,
-        layer_inputs: list[list[float]],
-        y_pred: list[float],
-        y_true: list[float],
-        learning_rate: float,
-        loss_fn: LossFunction,
-    ):
-        """Performs a backward pass (backpropagation) and updates parameters."""
-        # Compute gradient of loss with respect to prediction
-        layer_gradients = loss_fn.derivative(y_pred, y_true)
-
-        # Iterate backwards from output layer to input layer
-        for layer_idx in reversed(range(len(self.layers))):
-            layer = self.layers[layer_idx]
-            x_in = layer_inputs[layer_idx]
-
-            next_layer_gradients = [0.0] * len(x_in)
-            layer_output = layer.forward(x_in)
-
-            for j in range(layer.output_size):
-                output_j = layer_output[j]
-
-                # Calculate delta
-                if layer.activation:
-                    delta = layer_gradients[j] * layer.activation.derivative(output_j)
-                else:
-                    delta = layer_gradients[j]
-
-                # Update bias
-                layer.bias[j] -= learning_rate * delta
-
-                # Update weights and accumulate next layer gradients
-                for i in range(layer.input_size):
-                    next_layer_gradients[i] += delta * layer.weights[j][i]
-                    layer.weights[j][i] -= learning_rate * delta * x_in[i]
-
-            layer_gradients = next_layer_gradients
-
-    def _train_step(
-        self,
-        x: list[float],
-        y_true: list[float],
-        learning_rate: float,
-        loss_fn: LossFunction,
-    ) -> float:
-        """Runs a single forward and backward step for one training sample, returning the loss."""
-        # 1. Forward Pass
-        y_pred, layer_inputs = self._forward_step(x)
-
-        # 2. Compute Loss
-        loss = loss_fn(y_pred, y_true)
-
-        # 3. Backward Pass
-        self._backward_step(layer_inputs, y_pred, y_true, learning_rate, loss_fn)
-
-        return loss
-
-    def train(
-        self,
-        inputs: list[list[float]],
-        targets: list[list[float]],
-        epochs: int,
-        learning_rate: float,
-        loss_fn: LossFunction,
-        observer: EpochObserver | None = None,
-    ):
-        """Trains the network by running train steps over multiple epochs."""
-        assert len(inputs) == len(targets)
-
-        for epoch in range(epochs):
-            total_loss = 0.0
-
-            for x, y_true in zip(inputs, targets):
-                total_loss += self._train_step(x, y_true, learning_rate, loss_fn)
-
-            # Notify observer at the end of each epoch
-            if observer is not None:
-                observer.on_epoch_end(epoch, epochs, total_loss / len(inputs))
+from lib.activations import ReLU, Sigmoid
+from lib.losses import MeanSquaredError
+from lib.observers import ConsoleEpochObserver, PlotEpochObserver, CompositeEpochObserver
+from lib.layers import NeuralLayer
+from lib.network import NeuralNetwork
 
 
 def main():
-    """Entry point."""
+    # Helper for weight initialization between -1.0 and 1.0
+    random_weight_init = lambda: random.uniform(-1.0, 1.0)
     random.seed(42)
 
     nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU()))
-    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid()))
+    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU(), random_func=random_weight_init))
+    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid(), random_func=random_weight_init))
 
     if not nn.validate():
         print("Invalid neural network configuration.")
@@ -344,19 +28,19 @@ def main():
 
     print("--- Predictions BEFORE training ---")
     for x in inputs:
-        prediction = nn.predict(x)
+        prediction = nn.forward(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     print("\n--- Training ---")
-
-    console_observer = ConsoleEpochObserver(frequency=200)
+    # Setup modular observers
+    console_observer = ConsoleEpochObserver(frequency=2000)
     plot_observer = PlotEpochObserver()
     composite_observer = CompositeEpochObserver([console_observer, plot_observer])
 
     nn.train(
         inputs,
         targets,
-        epochs=1000,
+        epochs=10000,
         learning_rate=0.2,
         loss_fn=MeanSquaredError(),
         observer=composite_observer,
@@ -364,7 +48,7 @@ def main():
 
     print("\n--- Predictions AFTER training ---")
     for x in inputs:
-        prediction = nn.predict(x)
+        prediction = nn.forward(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
     # Plot the results
