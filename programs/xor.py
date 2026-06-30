@@ -1,15 +1,13 @@
-from typing import TypedDict
-from lib.program import NeuralNetworkProgram
+from lib.program import NeuralNetworkProgram, BaseTrainingParams
 from lib.activations import ReLU, Sigmoid
 from lib.losses import MeanSquaredError, LossFunction
 from lib.layers import NeuralLayer
 from lib.network import NeuralNetwork
 
 
-class XorTrainingParams(TypedDict):
+class XorTrainingParams(BaseTrainingParams):
     """Specific hyperparameters required to train the XOR model."""
-    epochs: int
-    learning_rate: float
+    pass
 
 
 class XorTaskProgram(NeuralNetworkProgram[list[list[float]], list[list[float]], XorTrainingParams]):

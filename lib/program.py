@@ -6,6 +6,7 @@ It also implements the RunObserver pattern to modularize run reporting.
 """
 
 from abc import ABC, abstractmethod
+from typing import TypedDict
 from lib.network import NeuralNetwork
 from lib.losses import LossFunction
 
@@ -24,7 +25,7 @@ class RunObserver(ABC):
         pass
 
     @abstractmethod
-    def on_prediction(self, input_val: list[float], decoded_prediction: str):
+    def on_prediction(self, input_repr: str, decoded_prediction: str):
         """Called for each individual input prediction during evaluation."""
         pass
 
@@ -48,8 +49,8 @@ class ConsoleRunObserver(RunObserver):
     def on_predictions_start(self, phase: str):
         print(f"\n--- Predictions {phase} training ---")
 
-    def on_prediction(self, input_val: list[float], decoded_prediction: str):
-        print(f"Input: {input_val} -> Prediction: {decoded_prediction}")
+    def on_prediction(self, input_repr: str, decoded_prediction: str):
+        print(f"Input: {input_repr} -> Prediction: {decoded_prediction}")
 
     def on_training_start(self):
         print("\n--- Training ---")
@@ -58,13 +59,25 @@ class ConsoleRunObserver(RunObserver):
         print(message)
 
 
-# Constrain T_In and T_Out to be list[list[float]] to ensure neural network compatibility
-class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_Params](ABC):
+class BaseTrainingParams(TypedDict):
+    """Base TypedDict representing the minimum set of hyperparameters required to train a network."""
+    epochs: int
+    learning_rate: float
+
+
+# Constrain T_In and T_Out to be list[list[float]], and T_Params to BaseTrainingParams to guarantee standard hyperparameters
+class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_Params: BaseTrainingParams](ABC):
     """Abstract base class representing a single neural network task/program."""
 
     def __init__(self):
         self.inputs: T_In | None = None
         self.targets: T_Out | None = None
+
+    def repr_input(self, input_val: list[float]) -> str:
+        """Returns a string representation of an input vector for logging."""
+        if len(input_val) > 10:
+            return f"<Vector of size {len(input_val)}>"
+        return str(input_val)
 
     @property
     @abstractmethod
@@ -127,7 +140,7 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
         observer.on_predictions_start("BEFORE")
         for x in inputs:
             prediction = nn.forward(x)
-            observer.on_prediction(x, self.decode_output(prediction))
+            observer.on_prediction(self.repr_input(x), self.decode_output(prediction))
 
         observer.on_training_start()
 
@@ -139,14 +152,8 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
 
         # 3. Train the model using task parameters
         params = self.get_default_training_params()
-
-        # Handle params if it is a dictionary (like TypedDict) or a custom object
-        if isinstance(params, dict):
-            epochs = params["epochs"]
-            learning_rate = params["learning_rate"]
-        else:
-            epochs = getattr(params, "epochs")
-            learning_rate = getattr(params, "learning_rate")
+        epochs = params["epochs"]
+        learning_rate = params["learning_rate"]
 
         nn.train(
             inputs,
@@ -160,7 +167,7 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
         observer.on_predictions_start("AFTER")
         for x in inputs:
             prediction = nn.forward(x)
-            observer.on_prediction(x, self.decode_output(prediction))
+            observer.on_prediction(self.repr_input(x), self.decode_output(prediction))
 
         # Plot visual metrics if requested
         if show_loss:
