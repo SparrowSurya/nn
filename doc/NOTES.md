@@ -23,6 +23,30 @@ Imagine predicting whether a house will sell for a high price based on two input
 | **No Manual Feature Engineering**: Automatically learns features from raw data. | **Black Box**: Hard to interpret *why* a network made a specific prediction. |
 | **Generalization**: Performs well on unseen data if trained correctly. | **Computationally Expensive**: Requires significant CPU/GPU resources to train. |
 
+```
+    ┌────────────────────────────────────────────────────────┐
+    │               ARTIFICIAL INTELLIGENCE (AI)             │
+    │  (Broadest category: Systems that simulate human mind) │
+    │  ┌──────────────────────────────────────────────────┐  │
+    │  │               MACHINE LEARNING (ML)              │  │
+    │  │  (Systems that learn patterns from data)         │  │
+    │  │  ┌────────────────────────────────────────────┐  │  │
+    │  │  │               DEEP LEARNING (DL)           │  │  │
+    │  │  │  (Neural Networks with multiple layers)    │  │  │
+    │  │  │  ┌──────────────────────────────────────┐  │  │  │
+    │  │  │  │       LARGE LANGUAGE MODELS (LLMs)   │  │  │  │
+    │  │  │  │  (Deep Transformers trained on text) │  │  │  │
+    │  │  │  └──────────────────────────────────────┘  │  │  │
+    │  │  └────────────────────────────────────────────┘  │  │
+    │  └──────────────────────────────────────────────────┘  │
+    └────────────────────────────────────────────────────────┘
+```
+1. Artificial Intelligence (AI): The overall umbrella. Any system that mimics human intelligence, including old rule-based systems from the 1960s (like a chess bot that uses a decision tree).
+2. Machine Learning (ML): A sub-field of AI. Instead of writing hard-coded rules, we give the computer data and let it learn the rules itself (like a Spam Filter predicting spam based on word frequencies).
+3. Deep Learning (DL): A sub-field of ML. Specifically refers to using Deep Neural Networks (networks with many layers, like the multi-layer network you built in main.py).
+4. Large Language Models (LLMs): A specialized application of Deep Learning. They are deep neural networks utilizing the Transformer architecture, scaled up to billions of parameters, and trained specifically to understand and generate natural language.
+
+
 ---
 
 ## 2. Structure of a Neural Network

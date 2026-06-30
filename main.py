@@ -77,9 +77,11 @@ class EpochObserver(ABC):
 class ConsoleEpochObserver(EpochObserver):
     """Epoch observer that logs progress to the console at a set frequency."""
 
+    frequency: int
+    """How often (in epochs) progress should be logged to the console."""
+
     def __init__(self, frequency: int = 1000):
         self.frequency = frequency
-        """How often (in epochs) progress should be logged to the console."""
 
     def on_epoch_end(self, epoch: int, total_epochs: int, loss: float):
         """Callback to log output of current epoch to console."""
