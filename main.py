@@ -1,23 +1,18 @@
-"""
-This file is the main entry point of the program.
-"""
-
 import random
 from lib.activations import ReLU, Sigmoid
 from lib.losses import MeanSquaredError
 from lib.observers import ConsoleEpochObserver, PlotEpochObserver, CompositeEpochObserver
 from lib.layers import NeuralLayer
 from lib.network import NeuralNetwork
+from lib.visualizations import visualize_network_structure
 
 
 def main():
-    # Helper for weight initialization between -1.0 and 1.0
-    random_weight_init = lambda: random.uniform(-1.0, 1.0)
     random.seed(42)
 
     nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU(), random_func=random_weight_init))
-    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid(), random_func=random_weight_init))
+    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU()))
+    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid()))
 
     if not nn.validate():
         print("Invalid neural network configuration.")
@@ -51,8 +46,8 @@ def main():
         prediction = nn.forward(x)
         print(f"Input: {x} -> Prediction: {prediction}")
 
-    # Plot the results
     plot_observer.plot()
+    visualize_network_structure(nn)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ This module defines the representation of a single neural network layer,
 including weight matrix and bias vector.
 """
 
+import math
 import random
 from dataclasses import dataclass
 from typing import Self, Callable
@@ -30,10 +31,16 @@ class NeuralLayer:
         activation: ActivationFunction | None = None,
         random_func: Callable[[], float] | None = None,
     ) -> Self:
-        """Creates random values from input and output sizes."""
-        random_func = random.random if random_func is None else random_func
-        weights = [[random_func() for _ in range(input_size)] for _ in range(output_size)]
-        bias = [random_func() for _ in range(output_size)]
+        """
+        Creates random values from input and output sizes. Initialises weights proportional
+        to scale of input size.
+        """
+        scale = math.sqrt(2.0 / input_size)
+        weights = [
+            [random.uniform(-scale, scale) for _ in range(input_size)]
+            for _ in range(output_size)
+        ]
+        bias = [random.uniform(-0.1, 0.1) for _ in range(output_size)]
         return cls(weights, bias, activation)
 
     def __post_init__(self):
