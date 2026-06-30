@@ -270,22 +270,54 @@ These are the easiest to decide because they are strictly determined by your dat
 
 ### 2. Number and Size of Hidden Layers
 
-This is determined by the complexity of the problem.
+Choosing the number of hidden layers and their neuron count is one of the most critical aspects of neural network design. While it is partly an empirical science (trial and error), there are established mathematical theorems and practical heuristics that guide this process.
 
-#### Number of Hidden Layers (Depth)
+---
 
-* 0 Hidden Layers: Can only solve linearly separable problems (like simple linear regression, or AND/OR gates).
-* 1 Hidden Layer: Capable of approximating almost any continuous function (known as the Universal Approximation Theorem).
-* 2+ Hidden Layers: Used for complex tasks (images, audio, natural language). Deep layers learn hierarchical patterns: the first layer learns simple
-shapes (lines/edges), the next learns combinations of those shapes, and the final layers learn complex objects.
+#### A. Number of Hidden Layers (Depth)
 
-#### Size of Hidden Layers (Width)
+The depth of a network determines its level of abstraction. 
 
-* Rule of Thumb: Start with a size between your input and output size.
-* Too small: The network won't have enough capacity to learn the relationships (underfitting).
-* Too large: The network will memorize the training dataset instead of generalizing (overfitting), and it will train much slower.
-* XOR Example: Since input is  2  and output is  1 , projecting to a hidden layer of size  3  gives the network the mathematical flexibility to draw the
-decision boundaries needed for XOR.
+* **0 Hidden Layers**: Can only represent **linearly separable** functions. It behaves exactly like a collection of linear regression or perceptron models (e.g., AND/OR gates, linear classification).
+* **1 Hidden Layer**: According to the **Universal Approximation Theorem** (Hornik, 1989), a single hidden layer with a finite number of neurons and a non-linear activation function can approximate any continuous function to arbitrary precision. 
+  * *Verdict*: A single hidden layer is sufficient for simple datasets like XOR or MNIST digit classification.
+* **2+ Hidden Layers (Deep Networks)**: While a single layer can theoretically represent any function, it may require an impractically large number of neurons (width). Adding layers (depth) allows the network to learn **hierarchical feature representations** parameter-efficiently.
+  * *Example*: In computer vision, early layers learn edges, middle layers group edges into shapes, and deep layers group shapes into complex objects. Yoshua Bengio (2009) demonstrated that deep architectures can represent highly complex functions with exponentially fewer parameters than shallow architectures.
+
+---
+
+#### B. Size of Hidden Layers (Width)
+
+Choosing the number of neurons ($N_h$) in a hidden layer is a trade-off between network capacity and generalization. 
+
+* **Too Few Neurons**: **Underfitting**. The network lacks the capacity to capture the complex relationships in the training data.
+* **Too Many Neurons**: **Overfitting**. The network will memorize the training noise instead of generalizing to unseen data, and training will be computationally slow.
+
+##### Standard Design Heuristics (Rules of Thumb)
+
+Let $N_i$ be the number of inputs, and $N_o$ be the number of outputs.
+
+1. **The Geometric Mean / Pyramid Rule**:
+   A classic heuristic suggests that the hidden layer size should form a smooth bottleneck between the input and output sizes:
+   $$N_h = \sqrt{N_i \times N_o}$$
+   * *MNIST Example*: For $784$ inputs and $10$ outputs: $\sqrt{784 \times 10} \approx 88.5$ neurons.
+
+2. **The Interpolation Rule**:
+   The hidden layer size is typically between the input size and output size, often recommended as:
+   $$N_h = \frac{2}{3} N_i + N_o$$
+   * *MNIST Example*: $\frac{2}{3}(784) + 10 \approx 532$ neurons.
+   * Generally, $N_h$ should satisfy: $N_o < N_h < N_i$.
+
+3. **The Sample Size Bound (Overfitting Prevention)**:
+   To prevent overfitting when training without regularization (like dropout or weight decay), the number of parameters (weights + biases) should be significantly smaller than the number of training samples ($N_s$).
+   For a single hidden layer, the total parameters is $P = N_h(N_i + N_o + 1)$. A common guideline is to keep $P \le \frac{N_s}{c}$ where $c \ge 2$:
+   $$N_h \le \frac{N_s}{c \cdot (N_i + N_o + 1)}$$
+   * *MNIST Example*: If training on $N_s = 1000$ samples: $N_h \le \frac{1000}{2 \cdot (784 + 10 + 1)} \approx 0.63$ neurons. This mathematically shows why training a wide network on very few samples requires strong regularization or using a smaller input representation (like downsampling) to prevent overfitting!
+
+##### Practical Workflow
+1. **Start Small**: Start with a single hidden layer and a small number of neurons (e.g., $32$ or $64$ for MNIST).
+2. **Monitor Validation Loss**: If the network underfits (high training loss), increase the width (neurons) or depth (layers).
+3. **Apply Regularization**: If the network overfits (training loss decreases, but validation loss increases), decrease the width or add regularization (like weight decay or dropout).
 
 ### 3. Which Activation Function to Use?
 
