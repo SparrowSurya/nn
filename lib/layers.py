@@ -6,7 +6,7 @@ including weight matrix and bias vector.
 import math
 import random
 from dataclasses import dataclass
-from typing import Self, Callable
+from typing import Self
 from lib.activations import ActivationFunction
 
 
@@ -29,7 +29,6 @@ class NeuralLayer:
         input_size: int,
         output_size: int,
         activation: ActivationFunction | None = None,
-        random_func: Callable[[], float] | None = None,
     ) -> Self:
         """
         Creates random values from input and output sizes. Initialises weights proportional

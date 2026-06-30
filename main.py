@@ -1,53 +1,68 @@
+import argparse
 import random
-from lib.activations import ReLU, Sigmoid
-from lib.losses import MeanSquaredError
-from lib.observers import ConsoleEpochObserver, PlotEpochObserver, CompositeEpochObserver
-from lib.layers import NeuralLayer
-from lib.network import NeuralNetwork
-from lib.visualizations import visualize_network_structure
+import sys
+import importlib
+import inspect
+from typing import Any
+from lib.program import NeuralNetworkProgram
+
+
+def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, Any]] | None:
+    """Dynamically imports the program module and searches for a NeuralNetworkProgram subclass."""
+    module_name = program_name.lower()
+    try:
+        # Dynamically import programs.<module_name>
+        module_path = f"programs.{module_name}"
+        module = importlib.import_module(module_path)
+    except ImportError as e:
+        print(f"Error: Program module '{module_name}' not found in the 'programs' folder.")
+        print(f"Details: {e}")
+        print(f"Please check that 'programs/{module_name}.py' exists.")
+        return None
+
+    # Inspect module classes to find any class inheriting from NeuralNetworkProgram
+    for _, obj in inspect.getmembers(module, inspect.isclass):
+        if issubclass(obj, NeuralNetworkProgram) and obj is not NeuralNetworkProgram:
+            return obj
+
+    print(f"Error: No subclass of NeuralNetworkProgram found in 'programs.{module_name}'.")
+    return None
 
 
 def main():
-    random.seed(42)
-
-    nn = NeuralNetwork()
-    nn.add_layer(NeuralLayer.from_size(2, 3, ReLU()))
-    nn.add_layer(NeuralLayer.from_size(3, 1, Sigmoid()))
-
-    if not nn.validate():
-        print("Invalid neural network configuration.")
-        return
-
-    inputs = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]]
-    targets = [[0.0], [1.0], [1.0], [0.0]]
-
-    print("--- Predictions BEFORE training ---")
-    for x in inputs:
-        prediction = nn.forward(x)
-        print(f"Input: {x} -> Prediction: {prediction}")
-
-    print("\n--- Training ---")
-    # Setup modular observers
-    console_observer = ConsoleEpochObserver(frequency=2000)
-    plot_observer = PlotEpochObserver()
-    composite_observer = CompositeEpochObserver([console_observer, plot_observer])
-
-    nn.train(
-        inputs,
-        targets,
-        epochs=10000,
-        learning_rate=0.2,
-        loss_fn=MeanSquaredError(),
-        observer=composite_observer,
+    parser = argparse.ArgumentParser(description="Neural Network Task CLI Runner")
+    parser.add_argument(
+        "program",
+        type=str,
+        help="Name of the program to run (e.g. 'xor' to run programs/xor.py)"
+    )
+    parser.add_argument(
+        "--show-loss",
+        action="store_true",
+        help="Display the training loss progression graph at the end of training"
+    )
+    parser.add_argument(
+        "--show-network",
+        action="store_true",
+        help="Display the neural network weights and biases visualization diagram"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed for reproducibility (default: 42)"
     )
 
-    print("\n--- Predictions AFTER training ---")
-    for x in inputs:
-        prediction = nn.forward(x)
-        print(f"Input: {x} -> Prediction: {prediction}")
+    args = parser.parse_args()
+    random.seed(args.seed)
 
-    plot_observer.plot()
-    visualize_network_structure(nn)
+    program_class = get_program_class(args.program)
+    if program_class is None:
+        sys.exit(1)
+
+    # Instantiate and run the task program with optional visualization settings
+    task = program_class()
+    task.run(show_loss=args.show_loss, show_network=args.show_network)
 
 
 if __name__ == "__main__":
