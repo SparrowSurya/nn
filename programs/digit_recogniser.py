@@ -5,7 +5,7 @@ from typing import Callable, Any
 from PIL import Image, ImageDraw, ImageTk
 from lib.program import NeuralNetworkProgram, BaseTrainingParams
 from lib.activations import ReLU, Sigmoid
-from lib.losses import MeanSquaredError, LossFunction
+from lib.losses import MeanSquaredError, LossFunction, CategoricalCrossEntropy
 from lib.layers import NeuralLayer
 from lib.network import NeuralNetwork
 from lib.gui import NeuralNetworkGui
@@ -102,7 +102,7 @@ class DigitRecogniserTaskProgram(NeuralNetworkProgram[list[list[float]], list[li
         return inputs, targets
 
     def get_loss_function(self) -> LossFunction:
-        return MeanSquaredError()
+        return CategoricalCrossEntropy()
 
     def decode_output(self, raw_prediction: list[float]) -> str:
         # The output of the network is a list of 10 probabilities (one for each digit).

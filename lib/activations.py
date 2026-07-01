@@ -39,3 +39,16 @@ class ReLU(ActivationFunction):
 
     def derivative(self, activated_value: float) -> float:
         return 1.0 if activated_value > 0.0 else 0.0
+
+
+class LeakyReLU(ActivationFunction):
+    """Leaky Rectified Linear Unit (LeakyReLU) activation function."""
+
+    def __init__(self, alpha: float = 0.01):
+        self.alpha = alpha
+
+    def __call__(self, value: float) -> float:
+        return value if value > 0.0 else self.alpha * value
+
+    def derivative(self, activated_value: float) -> float:
+        return 1.0 if activated_value > 0.0 else self.alpha

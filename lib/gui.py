@@ -16,7 +16,7 @@ from lib.program import NeuralNetworkProgram
 from lib.network import NeuralNetwork
 from lib.visualizations import visualize_network_structure
 from lib.observers import RunObserver
-from lib.activations import ReLU, Sigmoid
+from lib.activations import ReLU, Sigmoid, LeakyReLU
 from lib.losses import MeanSquaredError
 from lib.layers import NeuralLayer
 from typing import Any, Callable
@@ -614,8 +614,8 @@ class NeuralNetworkGui:
         # Loss Function Dropdown
         tk.Label(global_frame, text="Loss Function:", font=("Arial", 11), bg=self.BG_COLOR, fg=self.FG_COLOR).grid(row=0, column=0, sticky="w", pady=5)
         
-        loss_var = tk.StringVar(value="MeanSquaredError")
-        loss_options = ["MeanSquaredError"]
+        loss_var = tk.StringVar(value=self.loss_fn.__class__.__name__)
+        loss_options = ["MeanSquaredError", "BinaryCrossEntropy", "CategoricalCrossEntropy"]
         loss_menu = tk.OptionMenu(global_frame, loss_var, *loss_options)
         loss_menu.config(font=("Arial", 10), width=18)
         loss_menu.grid(row=0, column=1, sticky="w", padx=10, pady=5)
@@ -692,7 +692,7 @@ class NeuralNetworkGui:
 
             tk.Label(row_frame, text="Act:", font=("Arial", 10), bg=self.BG_COLOR, fg=self.FG_COLOR).pack(side=tk.LEFT, padx=2)
             act_var = tk.StringVar(value=act_val)
-            act_menu = tk.OptionMenu(row_frame, act_var, "ReLU", "Sigmoid")
+            act_menu = tk.OptionMenu(row_frame, act_var, "ReLU", "Sigmoid", "LeakyReLU")
             act_menu.config(font=("Arial", 9), width=8)
             act_menu.pack(side=tk.LEFT, padx=2)
 
@@ -727,7 +727,12 @@ class NeuralNetworkGui:
 
         # Populate with existing hidden layers from self.nn
         for layer in self.nn.layers[:-1]:
-            act_name = "ReLU" if isinstance(layer.activation, ReLU) else "Sigmoid"
+            if isinstance(layer.activation, ReLU):
+                act_name = "ReLU"
+            elif isinstance(layer.activation, LeakyReLU):
+                act_name = "LeakyReLU"
+            else:
+                act_name = "Sigmoid"
             add_hidden_layer_row(layer.output_size, act_name)
 
         # Add Hidden Layer button
@@ -742,9 +747,14 @@ class NeuralNetworkGui:
         tk.Label(output_frame, text=f"Output Layer Size: {output_size} (Fixed)", font=("Arial", 11, "bold"), bg=self.BG_COLOR, fg="gray").pack(side=tk.LEFT, pady=5)
         
         tk.Label(output_frame, text="Activation:", font=("Arial", 10), bg=self.BG_COLOR, fg=self.FG_COLOR).pack(side=tk.LEFT, padx=10)
-        out_act_val = "Sigmoid" if isinstance(self.nn.layers[-1].activation, Sigmoid) else "ReLU"
+        if isinstance(self.nn.layers[-1].activation, Sigmoid):
+            out_act_val = "Sigmoid"
+        elif isinstance(self.nn.layers[-1].activation, LeakyReLU):
+            out_act_val = "LeakyReLU"
+        else:
+            out_act_val = "ReLU"
         out_act_var = tk.StringVar(value=out_act_val)
-        out_act_menu = tk.OptionMenu(output_frame, out_act_var, "ReLU", "Sigmoid")
+        out_act_menu = tk.OptionMenu(output_frame, out_act_var, "ReLU", "Sigmoid", "LeakyReLU")
         out_act_menu.config(font=("Arial", 9), width=8)
         out_act_menu.pack(side=tk.LEFT, padx=5)
 
@@ -773,7 +783,12 @@ class NeuralNetworkGui:
             
             # Map activations helpers
             def get_act(name: str):
-                return ReLU() if name == "ReLU" else Sigmoid()
+                if name == "ReLU":
+                    return ReLU()
+                elif name == "LeakyReLU":
+                    return LeakyReLU()
+                else:
+                    return Sigmoid()
 
             prev_size = input_size
             for idx, sz in enumerate(sizes):
@@ -790,7 +805,17 @@ class NeuralNetworkGui:
                 return
 
             self.nn = new_nn
-            self.loss_fn = MeanSquaredError()
+            
+            # Map loss helper
+            from lib.losses import BinaryCrossEntropy, CategoricalCrossEntropy
+            selected_loss_name = loss_var.get()
+            if selected_loss_name == "BinaryCrossEntropy":
+                self.loss_fn = BinaryCrossEntropy()
+            elif selected_loss_name == "CategoricalCrossEntropy":
+                self.loss_fn = CategoricalCrossEntropy()
+            else:
+                self.loss_fn = MeanSquaredError()
+
             self.trained = False
             
             messagebox.showinfo("Success", "Neural Network architecture updated successfully! Please re-train the model in Phase 2.")

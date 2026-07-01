@@ -2,7 +2,7 @@ from typing import Callable, Any
 import tkinter as tk
 from lib.program import NeuralNetworkProgram, BaseTrainingParams
 from lib.activations import ReLU, Sigmoid
-from lib.losses import MeanSquaredError, LossFunction
+from lib.losses import MeanSquaredError, LossFunction, BinaryCrossEntropy
 from lib.layers import NeuralLayer
 from lib.network import NeuralNetwork
 from lib.gui import NeuralNetworkGui
@@ -33,7 +33,7 @@ class XorTaskProgram(NeuralNetworkProgram[list[list[float]], list[list[float]], 
         return inputs, targets
 
     def get_loss_function(self) -> LossFunction:
-        return MeanSquaredError()
+        return BinaryCrossEntropy()
 
     def decode_output(self, raw_prediction: list[float]) -> str:
         prob = raw_prediction[0]
