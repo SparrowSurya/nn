@@ -6,7 +6,7 @@ forward propagation, backpropagation, and parameters optimization over epochs.
 from dataclasses import dataclass, field
 from lib.layers import NeuralLayer
 from lib.losses import LossFunction
-from lib.observers import EpochObserver
+from lib.observers import RunObserver
 
 
 @dataclass
@@ -115,7 +115,7 @@ class NeuralNetwork:
         epochs: int,
         learning_rate: float,
         loss_fn: LossFunction,
-        observer: EpochObserver | None = None,
+        observer: RunObserver | None = None,
     ):
         """Trains the network by running train steps over multiple epochs."""
         assert len(inputs) == len(targets)

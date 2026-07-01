@@ -5,6 +5,7 @@ import importlib
 import inspect
 from typing import Any
 from lib.program import NeuralNetworkProgram
+from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver
 
 
 def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, Any]] | None:
@@ -60,9 +61,31 @@ def main():
     if program_class is None:
         sys.exit(1)
 
-    # Instantiate and run the task program with optional visualization settings
+    # Instantiate the task program
     task = program_class()
-    task.run(show_loss=args.show_loss, show_network=args.show_network)
+
+    # Build the observers in main.py
+    params = task.get_default_training_params()
+    frequency = int(params.get("console_frequency", 2000))
+    console_observer = ConsoleRunObserver(frequency=frequency)
+    plot_observer = PlotRunObserver() if args.show_loss else None
+
+    # Package into a single CompositeRunObserver
+    observers: list[RunObserver] = [console_observer]
+    if plot_observer is not None:
+        observers.append(plot_observer)
+
+    composite_observer = CompositeRunObserver(observers)
+
+    # Run the task program with the composite observer
+    task.run(
+        composite_observer,
+        show_network=args.show_network
+    )
+
+    # Plot the loss curve if the observer was constructed
+    if plot_observer is not None:
+        plot_observer.plot()
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ This file contains style guidelines, structural constraints, and behavioral inst
 ---
 
 ## 2. Execution & Command Constraints
-* **No Unauthorized Script Execution**: Do **NOT** execute the main Python script (`main.py` or task programs) unless the user explicitly tells you to do so in the prompt.
+* **No Script Execution**: Do **NOT** run the main python script (`main.py` or task programs) under any circumstances. Never run the main program.
 * **Terminal Command Approvals**: Always propose terminal commands and ask for explicit user permission before executing any command or script.
 
 ---
@@ -38,3 +38,4 @@ This file contains style guidelines, structural constraints, and behavioral inst
 * **No Direct Solutions for Hints**: When the user asks for hints or learning assistance, do **NOT** provide direct copy-paste code solutions. Explain the underlying mathematical or architectural concepts and guide the user to implement the solution themselves.
 * **Clickable File Links**: Always use the `file://` scheme to reference files (e.g., `[main.py](file:///Users/user/lab/nn/main.py)`). Do not wrap the link text in backticks.
 * **Dynamic Rule Learning**: Always update this `AGENTS.md` file immediately whenever the user asserts that you should "do this thing from now on" or establishes new workspace-wide constraints.
+* **Always Present Implementation Plan**: Before implementing any code changes or file modifications, you MUST present a step-by-step implementation plan in the chat for the user to review, whether or not the user explicitly asks for it.

@@ -5,59 +5,12 @@ with bounds to ensure type safety for input/output dataset structures.
 It also implements the RunObserver pattern to modularize run reporting.
 """
 
+
 from abc import ABC, abstractmethod
 from typing import TypedDict, NotRequired
 from lib.network import NeuralNetwork
 from lib.losses import LossFunction
-from lib.observers import EpochObserver, PlotEpochObserver
-
-
-class RunObserver(ABC):
-    """Abstract base class representing an observer for the entire program execution pipeline."""
-
-    @abstractmethod
-    def on_run_start(self, program_name: str):
-        """Called when the program execution starts."""
-        pass
-
-    @abstractmethod
-    def on_predictions_start(self, phase: str):
-        """Called before starting the list of prediction outputs (e.g., 'BEFORE', 'AFTER')."""
-        pass
-
-    @abstractmethod
-    def on_prediction(self, input_repr: str, target_repr: str, prediction_repr: str):
-        """Called for each individual input prediction during evaluation."""
-        pass
-
-    @abstractmethod
-    def on_training_start(self):
-        """Called when the training process begins."""
-        pass
-
-    @abstractmethod
-    def on_validation_error(self, message: str):
-        """Called when neural network configuration validation fails."""
-        pass
-
-
-class ConsoleRunObserver(RunObserver):
-    """Default implementation of RunObserver that prints step progression to the console."""
-
-    def on_run_start(self, program_name: str):
-        print(f"Executing program: {program_name}")
-
-    def on_predictions_start(self, phase: str):
-        print(f"\n--- Predictions {phase} training ---")
-
-    def on_prediction(self, input_repr: str, target_repr: str, prediction_repr: str):
-        print(f"Input: {input_repr} -> Expected: {target_repr} | Predicted: {prediction_repr}")
-
-    def on_training_start(self):
-        print("\n--- Training ---")
-
-    def on_validation_error(self, message: str):
-        print(message)
+from lib.observers import RunObserver
 
 
 class BaseTrainingParams(TypedDict):
@@ -74,7 +27,6 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
     def __init__(self):
         self.inputs: T_In | None = None
         self.targets: T_Out | None = None
-        self.plot_observer: PlotEpochObserver | None = None
 
     def repr_input(self, input_val: list[float]) -> str:
         """Returns a string representation of an input vector for logging."""
@@ -131,30 +83,12 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
         """Returns the default training hyperparameters."""
         pass
 
-    def build_epoch_observer(self) -> EpochObserver:
-        """Constructs the training epoch observer(s) to monitor loss progress."""
-        from lib.observers import ConsoleEpochObserver, PlotEpochObserver, CompositeEpochObserver
-        params = self.get_default_training_params()
-
-        # Read console frequency if specified in the training parameters, default to 2000
-        frequency = 2000
-        if "console_frequency" in params:
-            frequency = int(params["console_frequency"])
-
-        console_obs = ConsoleEpochObserver(frequency=frequency)
-        self.plot_observer = PlotEpochObserver()
-        return CompositeEpochObserver([console_obs, self.plot_observer])
-
     def run(
         self,
-        observer: RunObserver | None = None,
-        show_loss: bool = False,
+        observer: RunObserver,
         show_network: bool = False,
     ):
         """Orchestrates the entire data loading, network validation, training, and visualization pipeline."""
-        if observer is None:
-            observer = ConsoleRunObserver()
-
         observer.on_run_start(self.name)
 
         # 1. Build and validate network
@@ -173,9 +107,6 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
 
         observer.on_training_start()
 
-        # Build observers dynamically using the customizable helper
-        epoch_observer = self.build_epoch_observer()
-
         # 3. Train the model using task parameters
         params = self.get_default_training_params()
         epochs = params["epochs"]
@@ -187,7 +118,7 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
             epochs=epochs,
             learning_rate=learning_rate,
             loss_fn=self.get_loss_function(),
-            observer=epoch_observer,
+            observer=observer,
         )
 
         observer.on_predictions_start("AFTER")
@@ -196,8 +127,6 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
             observer.on_prediction(self.repr_input(x), self.decode_target(y), self.decode_output(prediction))
 
         # Plot visual metrics if requested
-        if show_loss and self.plot_observer is not None:
-            self.plot_observer.plot()
         if show_network:
             from lib.visualizations import visualize_network_structure
             visualize_network_structure(nn)
