@@ -5,7 +5,7 @@ import importlib
 import inspect
 from typing import Any
 from lib.program import NeuralNetworkProgram
-from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver
+from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver, XorTestObserver
 
 
 def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, Any]] | None:
@@ -48,6 +48,11 @@ def main():
         help="Display the neural network weights and biases visualization diagram"
     )
     parser.add_argument(
+        "--manual-testing",
+        action="store_true",
+        help="Enable interactive manual testing of the trained model"
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -74,13 +79,16 @@ def main():
     observers: list[RunObserver] = [console_observer]
     if plot_observer is not None:
         observers.append(plot_observer)
+    if args.manual_testing and args.program.lower() == "xor":
+        observers.append(XorTestObserver())
 
     composite_observer = CompositeRunObserver(observers)
 
     # Run the task program with the composite observer
     task.run(
         composite_observer,
-        show_network=args.show_network
+        show_network=args.show_network,
+        manual_testing=args.manual_testing
     )
 
     # Plot the loss curve if the observer was constructed

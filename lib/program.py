@@ -87,6 +87,7 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
         self,
         observer: RunObserver,
         show_network: bool = False,
+        manual_testing: bool = False,
     ):
         """Orchestrates the entire data loading, network validation, training, and visualization pipeline."""
         observer.on_run_start(self.name)
@@ -130,3 +131,6 @@ class NeuralNetworkProgram[T_In: list[list[float]], T_Out: list[list[float]], T_
         if show_network:
             from lib.visualizations import visualize_network_structure
             visualize_network_structure(nn)
+
+        if manual_testing:
+            observer.on_test_model(nn)

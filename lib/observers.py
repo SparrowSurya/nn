@@ -4,6 +4,10 @@ training progress and execution steps of the neural network.
 """
 
 from abc import ABC
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from lib.network import NeuralNetwork
 
 
 class RunObserver(ABC):
@@ -35,6 +39,10 @@ class RunObserver(ABC):
 
     def on_validation_error(self, message: str):
         """Called when neural network configuration validation fails."""
+        pass
+
+    def on_test_model(self, nn: "NeuralNetwork"):
+        """Called when manual testing mode is enabled."""
         pass
 
 
@@ -125,3 +133,32 @@ class CompositeRunObserver(RunObserver):
     def on_validation_error(self, message: str):
         for observer in self.observers:
             observer.on_validation_error(message)
+
+    def on_test_model(self, nn: "NeuralNetwork"):
+        for observer in self.observers:
+            observer.on_test_model(nn)
+
+
+class XorTestObserver(RunObserver):
+    """Observer specifically for manual testing of the XOR model."""
+
+    def on_test_model(self, nn: "NeuralNetwork"):
+        print("\n--- Manual Testing (XOR) ---")
+        print("Enter input as 00, 01, 10, 11 (or 'exit' to quit):")
+        while True:
+            try:
+                user_input = input("Input: ").strip()
+                if user_input.lower() in ("exit", "quit", "q"):
+                    break
+                if len(user_input) != 2 or not all(c in "01" for c in user_input):
+                    print("Invalid input format. Use 00, 01, 10, or 11.")
+                    continue
+                x1 = float(user_input[0])
+                x2 = float(user_input[1])
+                prediction = nn.forward([x1, x2])
+                prob = prediction[0]
+                val = round(prob)
+                confidence = prob if val == 1 else (1.0 - prob)
+                print(f"Output: {val} ({confidence:.0%})")
+            except (KeyboardInterrupt, EOFError):
+                break
