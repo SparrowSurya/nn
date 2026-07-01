@@ -5,7 +5,7 @@ import importlib
 import inspect
 from typing import Any
 from lib.program import NeuralNetworkProgram
-from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver, XorTestObserver
+from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver, XorTestObserver, DigitTestObserver
 
 
 def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, Any]] | None:
@@ -79,8 +79,11 @@ def main():
     observers: list[RunObserver] = [console_observer]
     if plot_observer is not None:
         observers.append(plot_observer)
-    if args.manual_testing and args.program.lower() == "xor":
-        observers.append(XorTestObserver())
+    if args.manual_testing:
+        if args.program.lower() == "xor":
+            observers.append(XorTestObserver())
+        elif args.program.lower() == "digit_recogniser":
+            observers.append(DigitTestObserver())
 
     composite_observer = CompositeRunObserver(observers)
 
