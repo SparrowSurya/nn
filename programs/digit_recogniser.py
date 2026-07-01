@@ -1,10 +1,14 @@
 import struct
 import os
+import tkinter as tk
+from typing import Callable, Any
+from PIL import Image, ImageDraw, ImageTk
 from lib.program import NeuralNetworkProgram, BaseTrainingParams
 from lib.activations import ReLU, Sigmoid
 from lib.losses import MeanSquaredError, LossFunction
 from lib.layers import NeuralLayer
 from lib.network import NeuralNetwork
+from lib.gui import NeuralNetworkGui
 
 
 class DigitRecogniserTrainingParams(BaseTrainingParams):
@@ -112,4 +116,115 @@ class DigitRecogniserTaskProgram(NeuralNetworkProgram[list[list[float]], list[li
         # With 1,000 images, running 20 epochs takes a few seconds in pure Python.
         # We set learning rate to 0.1 for steady gradient descent.
         # We set console_frequency to 5 so we get training progress printed every 5 epochs.
-        return {"epochs": 20, "learning_rate": 0.1, "console_frequency": 1}
+        return {"epochs": 20, "learning_rate": 0.1, "console_frequency": 5}
+
+
+class DigitRecogniserGui(NeuralNetworkGui):
+    """GUI extension class for the digit recogniser task."""
+
+    def build_dataset_input_widget(self, parent: Any) -> tuple[Any, Callable[[list[float]], None]]:
+        canvas = tk.Canvas(parent, width=280, height=280, bg="black", highlightthickness=1, highlightbackground="gray")
+        canvas.pack(pady=5)
+        
+        photo_ref: list[Any] = [None]
+        
+        def update_fn(x: list[float]):
+            pixels = [int(p * 255) for p in x]
+            img = Image.new("L", (28, 28))
+            img.putdata(pixels)
+            img_resized = img.resize((280, 280), Image.Resampling.NEAREST)
+            photo = ImageTk.PhotoImage(img_resized)
+            photo_ref[0] = photo
+            canvas.delete("all")
+            canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+            
+        return canvas, update_fn
+
+    def build_manual_input_widget(self, parent: Any, on_predict: Callable[[list[float]], None]) -> Any:
+        canvas_frame = tk.Frame(parent, bg=self.BG_COLOR)
+        canvas_frame.pack(pady=5)
+
+        # Left Drawing Canvas
+        left_col = tk.Frame(canvas_frame, bg=self.BG_COLOR)
+        left_col.grid(row=0, column=0, padx=10)
+        tk.Label(left_col, text="Drawing Canvas", font=("Arial", 10, "bold"), bg=self.BG_COLOR, fg=self.FG_COLOR).pack(pady=2)
+        canvas = tk.Canvas(left_col, width=280, height=280, bg="black", highlightthickness=1, highlightbackground="gray")
+        canvas.pack()
+
+        # Right Preview Canvas
+        right_col = tk.Frame(canvas_frame, bg=self.BG_COLOR)
+        right_col.grid(row=0, column=1, padx=10)
+        tk.Label(right_col, text="28x28 Resized Preview", font=("Arial", 10, "bold"), bg=self.BG_COLOR, fg=self.FG_COLOR).pack(pady=2)
+        preview_canvas = tk.Canvas(right_col, width=280, height=280, bg="black", highlightthickness=1, highlightbackground="gray")
+        preview_canvas.pack()
+
+        # Pillow state
+        pil_img = Image.new("L", (280, 280), color=0)
+        pil_draw = ImageDraw.Draw(pil_img)
+        last_x = [None]
+        last_y = [None]
+        preview_photo_ref: list[Any] = [None]
+
+        # Mouse event handlers
+        def on_press(event):
+            last_x[0] = event.x
+            last_y[0] = event.y
+
+        def on_drag(event):
+            if last_x[0] is not None and last_y[0] is not None:
+                canvas.create_line(
+                    last_x[0], last_y[0], event.x, event.y,
+                    fill="white", width=14, capstyle=tk.ROUND, smooth=True
+                )
+                pil_draw.line(
+                    [last_x[0], last_y[0], event.x, event.y],
+                    fill=255, width=14
+                )
+            last_x[0] = event.x
+            last_y[0] = event.y
+
+        def on_release(event):
+            last_x[0] = None
+            last_y[0] = None
+
+        canvas.bind("<Button-1>", on_press)
+        canvas.bind("<B1-Motion>", on_drag)
+        canvas.bind("<ButtonRelease-1>", on_release)
+
+        # Control buttons
+        ctrl_btn_frame = tk.Frame(parent, bg=self.BG_COLOR)
+        ctrl_btn_frame.pack(pady=10)
+
+        def clear_drawing():
+            canvas.delete("all")
+            preview_canvas.delete("all")
+            preview_photo_ref[0] = None
+            pil_draw.rectangle([0, 0, 280, 280], fill=0)
+
+        def run_predict():
+            predict_btn.config(state=tk.DISABLED)
+            clear_btn.config(state=tk.DISABLED)
+            parent.winfo_toplevel().update_idletasks()
+
+            try:
+                resized = pil_img.resize((28, 28), Image.Resampling.LANCZOS)
+                preview_img = resized.resize((280, 280), Image.Resampling.NEAREST)
+                photo = ImageTk.PhotoImage(preview_img)
+                preview_photo_ref[0] = photo
+                preview_canvas.delete("all")
+                preview_canvas.create_image(0, 0, anchor=tk.NW, image=photo)
+
+                pixels = list(resized.getdata())  # type: ignore
+                scaled = [float(p) / 255.0 for p in pixels]
+                on_predict(scaled)
+            finally:
+                predict_btn.config(state=tk.NORMAL)
+                clear_btn.config(state=tk.NORMAL)
+
+        clear_btn = tk.Button(ctrl_btn_frame, text="Clear", font=("Arial", 11), command=clear_drawing, width=10)
+        clear_btn.grid(row=0, column=0, padx=10)
+
+        predict_btn = tk.Button(ctrl_btn_frame, text="Predict", font=("Arial", 11), command=run_predict, width=10)
+        predict_btn.grid(row=0, column=1, padx=10)
+
+        return canvas_frame

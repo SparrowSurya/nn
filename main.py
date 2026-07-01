@@ -6,6 +6,7 @@ import inspect
 from typing import Any
 from lib.program import NeuralNetworkProgram
 from lib.observers import ConsoleRunObserver, PlotRunObserver, CompositeRunObserver, RunObserver, XorTestObserver, DigitTestObserver
+from lib.gui import NeuralNetworkGui
 
 
 def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, Any]] | None:
@@ -27,6 +28,23 @@ def get_program_class(program_name: str) -> type[NeuralNetworkProgram[Any, Any, 
             return obj
 
     print(f"Error: No subclass of NeuralNetworkProgram found in 'programs.{module_name}'.")
+    return None
+
+
+def get_gui_class(program_name: str) -> type[NeuralNetworkGui] | None:
+    """Dynamically imports the program module and searches for a NeuralNetworkGui subclass."""
+    module_name = program_name.lower()
+    try:
+        module_path = f"programs.{module_name}"
+        module = importlib.import_module(module_path)
+    except ImportError:
+        return None
+
+    # Inspect module classes to find any class inheriting from NeuralNetworkGui
+    for _, obj in inspect.getmembers(module, inspect.isclass):
+        if issubclass(obj, NeuralNetworkGui) and obj is not NeuralNetworkGui:
+            return obj
+
     return None
 
 
@@ -53,6 +71,11 @@ def main():
         help="Enable interactive manual testing of the trained model"
     )
     parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run the program in headless console mode instead of the interactive GUI"
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         default=42,
@@ -69,34 +92,43 @@ def main():
     # Instantiate the task program
     task = program_class()
 
-    # Build the observers in main.py
-    params = task.get_default_training_params()
-    frequency = int(params.get("console_frequency", 2000))
-    console_observer = ConsoleRunObserver(frequency=frequency)
-    plot_observer = PlotRunObserver() if args.show_loss else None
+    if args.headless:
+        # Build the observers for headless mode in main.py
+        params = task.get_default_training_params()
+        frequency = int(params.get("console_frequency", 2000))
+        console_observer = ConsoleRunObserver(frequency=frequency)
+        plot_observer = PlotRunObserver() if args.show_loss else None
 
-    # Package into a single CompositeRunObserver
-    observers: list[RunObserver] = [console_observer]
-    if plot_observer is not None:
-        observers.append(plot_observer)
-    if args.manual_testing:
-        if args.program.lower() == "xor":
-            observers.append(XorTestObserver())
-        elif args.program.lower() == "digit_recogniser":
-            observers.append(DigitTestObserver())
+        # Package into a single CompositeRunObserver
+        observers: list[RunObserver] = [console_observer]
+        if plot_observer is not None:
+            observers.append(plot_observer)
+        if args.manual_testing:
+            if args.program.lower() == "xor":
+                observers.append(XorTestObserver())
+            elif args.program.lower() == "digit_recogniser":
+                observers.append(DigitTestObserver())
 
-    composite_observer = CompositeRunObserver(observers)
+        composite_observer = CompositeRunObserver(observers)
 
-    # Run the task program with the composite observer
-    task.run(
-        composite_observer,
-        show_network=args.show_network,
-        manual_testing=args.manual_testing
-    )
+        # Run the task program with the composite observer in headless mode
+        task.run(
+            composite_observer,
+            show_network=args.show_network,
+            manual_testing=args.manual_testing
+        )
 
-    # Plot the loss curve if the observer was constructed
-    if plot_observer is not None:
-        plot_observer.plot()
+        # Plot the loss curve if the observer was constructed
+        if plot_observer is not None:
+            plot_observer.plot()
+    else:
+        # Run in GUI mode
+        gui_class = get_gui_class(args.program)
+        if gui_class is None:
+            gui = NeuralNetworkGui(task)
+        else:
+            gui = gui_class(task)
+        gui.run()
 
 
 if __name__ == "__main__":

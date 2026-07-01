@@ -17,8 +17,9 @@ This file contains style guidelines, structural constraints, and behavioral inst
 ---
 
 ## 3. Quality & Type Safety
-* **Always Run Pyright**: Always run static type-checking (`uv run pyright`) after making any code changes to guarantee the codebase remains 100% type-safe with `0 errors`.
+* **Run Pyright without Approval**: Since type-checking (uv run pyright) is a read-only operation, always run static type-checking (`uv run pyright`) automatically without asking after making any code changes to guarantee the codebase remains 100% type-safe with `0 errors`.
 * **Python Version & Generics**: The project uses Python 3.12+ / 3.14. Always use PEP 695 Type Parameter syntax for generic classes (using square brackets, e.g. `class NeuralNetworkProgram[T_In, T_Out](ABC)`) instead of old `typing.TypeVar`/`typing.Generic` imports.
+* **Module-Level Imports**: Always place all module-level imports (imports not contained within a function or method scope) at the very top of the file.
 
 ---
 
